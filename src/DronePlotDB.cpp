@@ -234,6 +234,35 @@ DronePlotDB::~DronePlotDB() {
 
 void DronePlotDB::addPlot(int drone_id, int node_id, time_t timestamp, float latitude, float longitude) {
    // First lock the mutex (blocking)
+
+
+   
+   std::list<DronePlot>::iterator dpit = _dbdata.begin();
+   for ( ; dpit != _dbdata.end(); dpit++) {
+      int offset = dpit->timestamp-timestamp;
+      if(dpit->latitude == latitude && dpit->longitude == longitude && std::abs(offset) <= 6){
+         std::cout << "not putting duplicate in database " << dpit->latitude << dpit->longitude;
+         if(!this->coordinator){
+            this->coordinator = dpit->node_id;
+         }
+         this->offsets.emplace(node_id, offset);
+         return;
+      }
+   }
+
+   if(!dpit->synced && this->offsets.count(dpit->node_id) > 0 && dpit->node_id != this->coordinator){
+         dpit->timestamp += this->offsets[dpit->node_id];
+         dpit->synced=true;
+      }
+
+   dpit = _dbdata.begin();
+   for ( ; dpit != _dbdata.end(); dpit++) {
+      if(!dpit->synced && this->offsets.count(dpit->node_id) > 0 && dpit->node_id != this->coordinator){
+         dpit->timestamp += this->offsets[dpit->node_id];
+         dpit->synced=true;
+      }
+   }
+
    pthread_mutex_lock(&_mutex);
 
    _dbdata.emplace_back(drone_id, node_id, timestamp, latitude, longitude);
@@ -454,10 +483,13 @@ std::list<DronePlot>::iterator DronePlotDB::erase(std::list<DronePlot>::iterator
    // First lock the mutex (blocking)
    pthread_mutex_lock(&_mutex);
 
-   return _dbdata.erase(dptr);
+   auto temp = _dbdata.erase(dptr);
+   std::cout<<"\n\n\n\nugh\n\n\n\n\n";
 
    // Unlock the mutex before we exit
    pthread_mutex_unlock(&_mutex);
+
+   return temp;
 
 }
 

@@ -109,7 +109,7 @@ TCPConn *TCPServer::handleSocket() {
    if (_sockfd.hasData()) {
 
       // Try to accept the connection
-      TCPConn *new_conn = new TCPConn(_server_log, _aes_key, _verbosity);
+      TCPConn *new_conn = new TCPConn(_server_log, _aes_key, _verbosity, false);
       if (!new_conn->accept(_sockfd)) {
          _server_log.strerrLog("Data received on socket but failed to accept.");
          return NULL;

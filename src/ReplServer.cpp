@@ -3,6 +3,8 @@
 #include "ReplServer.h"
 
 const time_t secs_between_repl = 20;
+const time_t secs_between_elect = 60;
+
 const unsigned int max_servers = 10;
 
 /*********************************************************************************************
@@ -21,7 +23,8 @@ ReplServer::ReplServer(DronePlotDB &plotdb, float time_mult)
                                _time_mult(time_mult),
                                _verbosity(1),
                                _ip_addr("127.0.0.1"),
-                               _port(9999)
+                               _port(9999),
+                               node(0)
 {
 }
 
@@ -74,6 +77,7 @@ void ReplServer::replicate() {
    // Track when we started the server
    _start_time = time(NULL);
    _last_repl = 0;
+   _last_elect = 0;
 
    // Set up our queue's listening socket
    _queue.bindSvr(_ip_addr.c_str(), _port);
@@ -87,7 +91,7 @@ void ReplServer::replicate() {
    while (!_shutdown) {
 
       // Check for new connections, process existing connections, and populate the queue as applicable
-      _queue.handleQueue();     
+      _queue.handleQueue();    
 
       // See if it's time to replicate and, if so, go through the database, identifying new plots
       // that have not been replicated yet and adding them to the queue for replication
@@ -95,6 +99,13 @@ void ReplServer::replicate() {
 
          queueNewPlots();
          _last_repl = getAdjustedTime();
+      }
+
+      //check if its time for an election
+      if (getAdjustedTime() - _last_elect > secs_between_elect) {
+
+         election();
+         _last_elect = getAdjustedTime();
       }
       
       // Check the queue for updates and pop them until the queue is empty. The pop command only returns
@@ -111,6 +122,15 @@ void ReplServer::replicate() {
       usleep(1000);
    }   
 }
+
+
+//method to handle elections
+void ReplServer::election(){
+   std::cout << "\n\nStarting election now\n\n";
+   int i = _queue.sendIsAlivetoAll(_queue.getServerID());
+   std::cout << "ds" << i << " is the coordinator\n";
+}
+
 
 /**********************************************************************************************
  * queueNewPlots - looks at the database and grabs the new plots, marshalling them and
@@ -134,7 +154,9 @@ unsigned int ReplServer::queueNewPlots() {
 
       // If this is a new one, marshall it and clear the flag
       if (dpit->isFlagSet(DBFLAG_NEW)) {
-         
+         if(!this->node){
+            this->node = dpit->node_id;
+         }
          dpit->serialize(marshall_data);
          dpit->clrFlags(DBFLAG_NEW);
 
@@ -201,7 +223,36 @@ void ReplServer::addReplDronePlots(std::vector<uint8_t> &data) {
       dptr += DronePlot::getDataSize();      
    }
    if (_verbosity >= 2)
-      std::cout << "Replicated in " << count << " plots\n";   
+      std::cout << "Replicated in " << count << " plots\n"; 
+
+
+   // //check if we have added any duplicates. mark them and record the offset 
+   // std::list<DronePlot>::iterator dpit1 = _plotdb.begin();
+   // for ( ; dpit1 != _plotdb.end(); dpit1++) {
+   //          std::cout << "stuck loop 1\n";
+   //    for(auto dpitInner = _plotdb.begin(); dpitInner!=dpit1; dpitInner++){
+   //       int offset = dpitInner->timestamp-dpit1->timestamp;
+   //       if(dpit1->latitude == dpitInner->latitude && dpit1->longitude == dpitInner->longitude && std::abs(offset) <= 6){
+   //          if(this->offsets.count(dpitInner->node_id) == 0){
+   //             this->offsets.emplace(dpitInner->node_id, offset);
+   //          }
+   //          dpitInner->dup = true;
+   //       }
+   //    }
+   // }
+
+   // //adjust the timestamp according to offset of plots from other nodes and remove marked duplicates
+   // std::list<DronePlot>::iterator dpit = _plotdb.begin();
+   // for ( ; dpit != _plotdb.end(); dpit++) {
+   //    std::cout << "stuck loop 2\n";
+   //    if(!dpit->synced && this->offsets.count(dpit->node_id) > 0){
+   //       dpit->timestamp += this->offsets[dpit->node_id];
+   //       dpit->synced=true;
+   //    }
+   //    if(dpit->dup){
+   //       dpit = this->_plotdb.erase(dpit);
+   //    }
+   //  }
 }
 
 
@@ -214,6 +265,16 @@ void ReplServer::addSingleDronePlot(std::vector<uint8_t> &data) {
    DronePlot tmp_plot;
 
    tmp_plot.deserialize(data);
+
+   // std::list<DronePlot>::iterator dpit = _plotdb.begin();
+   // for ( ; dpit != _plotdb.end(); dpit++) {
+   //    int offset = tmp_plot.timestamp-dpit->timestamp;
+   //    if(dpit->latitude == tmp_plot.latitude && dpit->longitude == tmp_plot.longitude && std::abs(offset) <= 6){
+   //       std::cout << "not putting duplicate in database " << dpit->latitude << dpit->longitude;
+   //       this->offsets.emplace(tmp_plot.node_id, offset);
+   //       return;
+   //    }
+   // }
 
    _plotdb.addPlot(tmp_plot.drone_id, tmp_plot.node_id, tmp_plot.timestamp, tmp_plot.latitude,
                                                          tmp_plot.longitude);

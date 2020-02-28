@@ -216,6 +216,47 @@ void QueueMgr::sendToAll(std::vector<uint8_t> &data) {
 
 }
 
+
+//sends is alive to every higher numbered server for election
+int QueueMgr::sendIsAlivetoAll(const char* sid){ 
+   int highestServer = atoi(sid+2);
+   unsigned int startingSeverIndex = 0;
+   for (unsigned int i=0; i<_server_list.size(); i++) {
+      const char* osid = std::get<0>(_server_list[i]).c_str();
+      if (std::lexicographical_compare(sid, sid+2, osid, osid+2)){
+         startingSeverIndex = i;
+         break;
+      }
+   }
+   for (unsigned int i=startingSeverIndex; i<_server_list.size(); i++) {
+      // Find the IP address of the destination server
+      unsigned long ip_addr = std::get<1>(_server_list[i]);
+      unsigned short port = std::get<2>(_server_list[i]);
+
+      //try to connect to check if server is alive
+      // Try to connect to the server and if there's an issue, delete and re-throw socket_error
+      TCPConn *new_conn = new TCPConn(_server_log, _aes_key, _verbosity, true);
+      try {
+         new_conn->connect(ip_addr, port);
+         const char* osid = std::get<0>(_server_list[i]).c_str();
+         int k = atoi(osid+2);
+         if(k > highestServer){
+            highestServer = k;
+         }
+         new_conn->disconnect();
+      } catch (socket_error &e) {
+         std::stringstream msg;
+         msg << "Connect to SID ds" << i << " failed when trying to conduct election. Msg: " <<
+                           e.what();
+         _server_log.writeLog(msg.str().c_str());
+         new_conn->disconnect();
+      }
+   }      
+   return highestServer;
+      
+   
+}
+
 /*********************************************************************************************
  * sendToServer - places data into the queue to be sent to the server indicated by
  *                server_id. Transmission will happen on its own
@@ -293,7 +334,7 @@ void QueueMgr::launchDataConn(const char *sid, std::vector<uint8_t> &data) {
    }
 
    // Try to connect to the server and if there's an issue, delete and re-throw socket_error
-   TCPConn *new_conn = new TCPConn(_server_log, _aes_key, _verbosity);
+   TCPConn *new_conn = new TCPConn(_server_log, _aes_key, _verbosity, false);
    new_conn->setNodeID(sid);
    new_conn->setSvrID(getServerID());
 

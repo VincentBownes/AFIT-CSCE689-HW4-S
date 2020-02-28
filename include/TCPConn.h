@@ -12,11 +12,11 @@ const int max_attempts = 2;
 class TCPConn 
 {
 public:
-   TCPConn(LogMgr &server_log, CryptoPP::SecByteBlock &key, unsigned int verbosity);
+   TCPConn(LogMgr &server_log, CryptoPP::SecByteBlock &key, unsigned int verbosity, bool election);
    ~TCPConn();
 
    // The current status of the connection
-   enum statustype { s_none, s_connecting, s_connected, s_datatx, s_datarx, s_waitack, s_hasdata };
+   enum statustype { s_none, s_connecting, s_auth1, s_auth2, s_auth3, s_auth4, s_auth5, s_connected, s_datatx, s_datarx, s_waitack, s_hasdata };
 
    statustype getStatus() { return _status; };
 
@@ -42,6 +42,12 @@ public:
    void encryptData(std::vector<uint8_t> &buf);
    void decryptData(std::vector<uint8_t> &buf);
 
+   void createRandomBits();
+   void encryptAndSendBitsToServer();
+   void encryptAndSendBitsToClient();
+   void waitForAuthFromClient();
+   void waitForAuthFromServer();
+
    // Input data received on the socket
    bool isInputDataReady() { return _data_ready; };
    void getInputData(std::vector<uint8_t> &buf);
@@ -63,7 +69,7 @@ public:
    bool isConnected();
 
    // When should we try to reconnect (prevents spam)
-   time_t reconnect;
+   time_t reconnect={};
 
    // Assign outgoing data and sets up the socket to manage the transmission
    void assignOutgoingData(std::vector<uint8_t> &data);
@@ -94,7 +100,7 @@ private:
 
    bool _connected = false;
 
-   std::vector<uint8_t> c_rep, c_endrep, c_auth, c_endauth, c_ack, c_sid, c_endsid;
+   std::vector<uint8_t> c_rep, c_endrep, c_rand, c_endrand, c_auth, c_endauth, c_ack, c_sid, c_endsid;
 
    statustype _status = s_none;
 
@@ -114,6 +120,13 @@ private:
    std::string _authstr;   // remembers the random authorization string sent
 
    unsigned int _verbosity;
+
+   //buffer to store local copy of random bits as well as recieved random bits
+   std::vector<uint8_t> _buf;
+   std::vector<uint8_t> recievedRand;
+
+   //tells the state machine whether to do an election or not
+   bool elect;
 
    LogMgr &_server_log;
 };

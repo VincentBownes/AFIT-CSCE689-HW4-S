@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 #include <unistd.h>
+#include <map>
 #include <pthread.h>
 #include "exceptions.h"
 
@@ -47,6 +48,9 @@ public:
    time_t timestamp;
    float latitude;
    float longitude;
+
+   bool synced; // had to use this since the built in flags did not seem to work correctly
+   bool dup;
    
 private:
    unsigned short _flags;
@@ -102,7 +106,17 @@ public:
 private:
    std::list<DronePlot> _dbdata;
 
+   //used to keep track of offsets
+   //map<nodeID, offset>
+   std::map<int, int> offsets;
+
+   //pick a coordinator
+   //I realize this is not an election algorithm but I think this is the only way
+   //to deal with time skew in the scenario where only points from the other two towers are received
+   unsigned int coordinator;
+
    pthread_mutex_t _mutex; 
+
 };
 
 

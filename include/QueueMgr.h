@@ -37,6 +37,9 @@ public:
 
    // Loads replication information into the Queue to transmit to servers
    void sendToAll(std::vector<uint8_t> &data);
+
+   //checks if other servers are alive for purpose of election. returns vector of server ids that respond
+   int sendIsAlivetoAll(const char* sid);
    void sendToServer(const char *server_id, std::vector<uint8_t> &data);
    
    // Overload simply to remove this server from _server_list. Calls parent funct

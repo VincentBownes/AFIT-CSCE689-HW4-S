@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <iostream>
 
 #include "FileDesc.h"
 #include "strfuncts.h"
@@ -234,8 +235,9 @@ bool SocketFD::connectTo(unsigned long ip_addr, unsigned short port) {
    _fd_addr.sin_addr.s_addr = ip_addr;
    _fd_addr.sin_port = port;
 
-   if (connect(_fd, (struct sockaddr *) &_fd_addr, sizeof(_fd_addr)) != 0)
+   if (connect(_fd, (struct sockaddr *) &_fd_addr, sizeof(_fd_addr)) != 0){
       return false;
+   }
 
    return true;
 

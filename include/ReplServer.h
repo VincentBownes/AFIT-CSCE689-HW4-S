@@ -39,9 +39,11 @@ private:
    void addSingleDronePlot(std::vector<uint8_t> &data);
 
    unsigned int queueNewPlots();
+   void election();
 
 
-   QueueMgr _queue;    
+   QueueMgr _queue; 
+   QueueMgr _election;   
 
    // Holds our drone plot information
    DronePlotDB &_plotdb;
@@ -57,12 +59,23 @@ private:
    // When the last replication happened so we can know when to do another one
    time_t _last_repl;
 
+   //last time we held an election
+   time_t _last_elect;
+
    // How much to spam stdout with server status
    unsigned int _verbosity;
 
    // Used to bind the server
    std::string _ip_addr;
    unsigned short _port;
+
+   //used to keep track of offsets
+   //map<nodeID, offset>
+   std::map<int, int> offsets;
+
+   //which node am I
+   //check node number coming in from antenna
+   unsigned int node;
 };
 
 
